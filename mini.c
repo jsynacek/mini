@@ -23,6 +23,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <locale.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -79,6 +80,7 @@ void buffer_adjust_gap(struct buffer *buf);
 int buffer_get_next_newline(struct buffer *buf, int from, int way);
 int buffer_get_line_beginning(struct buffer *buf);
 int buffer_get_line_end(struct buffer *buf);
+int buffer_get_line_offset(struct buffer *buf);
 int buffer_get_line_length(struct buffer *buf);
 void buffer_get_region(struct buffer *buf, int line_start, int lines, int *beg, int *end);
 void buffer_get_yx(struct buffer *buf, int *y, int *x);
@@ -111,6 +113,7 @@ void buffer_selection_toggle(struct buffer *buf);
 void buffer_selection_update(struct buffer *buf);
 
 /* utils */
+#define is_utf8(c) (((c) & 0xC0) != 0x80)
 bool is_position_in_buffer(int pos, struct buffer *buf);
 bool is_position_in_region(int pos, int beg, int end);
 int str_newlines(const char *str, int n);
@@ -290,10 +293,12 @@ void buffer_adjust_gap(struct buffer *buf)
 int buffer_get_next_newline(struct buffer *buf, int from, int way)
 {
 	int d = (way > 0) ? 1 : -1;
+	char c;
 
 	from += d;
 	while (from >= 0 && from < buf->used) {
-		if (buffer_data_at(buf, from) == '\n')
+		c = buffer_data_at(buf, from);
+		if (is_utf8(c) && c == '\n')
 			return from;
 		else
 			from += d;
@@ -327,9 +332,43 @@ int buffer_get_line_end(struct buffer *buf)
 	return nl;
 }
 
+/* Get cursor offset on the current line.
+ * Number of characters is returned.
+ * UTF-8 friendly.
+ */
+int buffer_get_line_offset(struct buffer *buf)
+{
+	int p, x = 0;
+	char c;
+		
+	p = buffer_get_line_beginning(buf);
+
+	while (p < buf->cursor) {
+		c = buffer_data_at(buf, p);
+		if (is_utf8(c)) {
+			if (buffer_data_at(buf, p) == '\t')
+				x += TAB_STOP - x % TAB_STOP;
+			else
+				x++;
+		}
+		p++;
+	}
+	return x;
+}
+	
 int buffer_get_line_length(struct buffer *buf)
 {
-	return buffer_get_line_end(buf) - buffer_get_line_beginning(buf);
+	int p, end, l = 0;
+
+	p = buffer_get_line_beginning(buf);
+	end = buffer_get_line_end(buf);
+	while (p < end) {
+		if (is_utf8(buffer_data_at(buf, p)))
+			l++;
+		p++;
+	}
+
+	return l;
 }
 
 /* Get buffer region between lines, including the lines.
@@ -356,35 +395,28 @@ void buffer_get_region(struct buffer *buf, int line_start, int lines, int *beg, 
 
 void buffer_get_yx(struct buffer *buf, int *y, int *x)
 {
-	int p;
-
-	p = buffer_get_line_beginning(buf);
 	*y = buf->cur_line;
-	*x = 0;
-	while (p < buf->cursor) {
-		if (buffer_data_at(buf, p) == '\t')
-			*x += TAB_STOP - *x % TAB_STOP;
-		else
-			*x += 1;
-		p++;
-	}
+	*x = buffer_get_line_offset(buf);
 }
 
 static void buffer_cursor_column_update(struct buffer *buf)
 {
-	buf->cursor_column = buf->cursor - buffer_get_line_beginning(buf);
+	buf->cursor_column = buffer_get_line_offset(buf);
 }
 
 void buffer_move_forward_char(struct buffer *buf)
 {
 	int p = buf->cursor + 1;
 
-	if (p <= buf->used) {
-		if (buffer_data_at(buf, buf->cursor) == '\n')
-			buf->cur_line++;
-		buf->cursor = p;
+	if (p > buf->used)
+		return;
 
-	}
+	if (buffer_data_at(buf, buf->cursor) == '\n')
+		buf->cur_line++;
+	while (p < buf->used && !is_utf8(buffer_data_at(buf, p)))
+		p++;
+	buf->cursor = p;
+
 	buffer_cursor_column_update(buf);
 	buffer_selection_update(buf);
 }
@@ -393,84 +425,75 @@ void buffer_move_backward_char(struct buffer *buf)
 {
 	int p = buf->cursor - 1;
 
-	if (p >= 0) {
-		buf->cursor = p;
-		if (buffer_data_at(buf, buf->cursor) == '\n')
+	if (p < 0)
+		return;
+
+	while (p > 0 && !is_utf8(buffer_data_at(buf, p)))
+		p--;
+	if (buffer_data_at(buf, p) == '\n')
 			buf->cur_line--;
-	}
+	buf->cursor = p;
+
 	buffer_cursor_column_update(buf);
 	buffer_selection_update(buf);
 }
 
 void buffer_move_forward_word(struct buffer *buf)
 {
-	while (!isalnum(buffer_data_at(buf, buf->cursor)) && buf->cursor < buf->used)
-		buffer_move_forward_char(buf);
-	while (isalnum(buffer_data_at(buf, buf->cursor)) && buf->cursor < buf->used)
-		buffer_move_forward_char(buf);
 }
 
 void buffer_move_backward_word(struct buffer *buf)
 {
-	while (!isalnum(buffer_data_at(buf, buf->cursor)) && buf->cursor > 0)
-		buffer_move_backward_char(buf);
-	while (isalnum(buffer_data_at(buf, buf->cursor)) && buf->cursor > 0)
-		buffer_move_backward_char(buf);
 }
 
 void buffer_move_forward_line(struct buffer *buf)
 {
-	int p = buf->cursor;
+	int ll, cc;
 
-	if (buffer_data_at(buf, buf->cursor) != '\n')
-		p = buffer_get_next_newline(buf, buf->cursor, 1);
-	if (p >= 0) {
-		int ll;
+	cc = buf->cursor_column;
+		
+	buffer_move_end_of_line(buf);
+	buffer_move_forward_char(buf);
 
-		buf->cursor = p + 1;
-		ll = buffer_get_line_length(buf);
-		if (buf->cursor_column < ll)
-			buf->cursor += buf->cursor_column;
-		else
-			buf->cursor += ll;
-		buf->cur_line++;
-	}
-	buffer_selection_update(buf);
+	ll = buffer_get_line_length(buf);
+	while (buffer_get_line_offset(buf) < cc
+	       && buffer_get_line_offset(buf) < ll)
+		buffer_move_forward_char(buf);
+
+	buf->cursor_column = cc;
 }
 
 void buffer_move_backward_line(struct buffer *buf)
 {
-	int p;
+	int ll, cc;
 
-	p = buffer_get_next_newline(buf, buf->cursor, -1);
-	if (p >= 0) {
-		int ll;
+	cc = buf->cursor_column;
 
-		p = buffer_get_next_newline(buf, p, -1);
-		/* p is -1 if the cursor is currently on the second line */
-		buf->cursor = p + 1;
-		ll = buffer_get_line_length(buf);
-		if (buf->cursor_column < ll)
-			buf->cursor += buf->cursor_column;
-		else
-			buf->cursor += ll;
-		buf->cur_line--;
-	}
-	buffer_selection_update(buf);
+	buffer_move_beginning_of_line(buf);
+	buffer_move_backward_char(buf);
+	buffer_move_beginning_of_line(buf);
+
+	ll = buffer_get_line_length(buf);
+	while (buffer_get_line_offset(buf) < cc
+	       && buffer_get_line_offset(buf) < ll)
+		buffer_move_forward_char(buf);
+
+	buf->cursor_column = cc;
 }
 
 void buffer_move_beginning_of_line(struct buffer *buf)
 {
 	int p, lb;
 
+	/* TODO: move the smartness somewhere else, perhaps to a separate command */
 	/* Be smart about blanks */
 	p = lb = buffer_get_line_beginning(buf);
 	while (isblank(buffer_data_at(buf, p)))
 		p++;
-	if (buf->cursor == p)
-		buf->cursor = lb;
-	else
-		buf->cursor = p;
+	/* if (buf->cursor == p) */
+	buf->cursor = lb;
+	/* else */
+	/* 	buf->cursor = p; */
 	buffer_cursor_column_update(buf);
 	buffer_selection_update(buf);
 }
@@ -530,34 +553,38 @@ void buffer_insert_string(struct buffer *buf, const char *str, size_t len)
 
 void buffer_delete_forward_char(struct buffer *buf)
 {
+	int p;
+
 	if (buf->cursor >= buf->used)
 		return;
 
-	buffer_delete_region(buf, buf->cursor, buf->cursor, NULL, NULL);
+	p = buf->cursor;
+	while (!is_utf8(buffer_data_at(buf, p + 1)) && (p + 1 < buf->used))
+		    p++;
+
+	buffer_delete_region(buf, buf->cursor, p, NULL, NULL);
 }
 
 void buffer_delete_backward_char(struct buffer *buf)
 {
+	int p;
+	
 	if (buf->cursor == 0)
 		return;
 
-	buffer_delete_region(buf, buf->cursor - 1, buf->cursor - 1, NULL, NULL);
+	p = buf->cursor;
+	while (!is_utf8(buffer_data_at(buf, p - 1)) && (p - 1 < buf->used))
+		    p--;
+	
+	buffer_delete_region(buf, buf->cursor - 1, p - 1, NULL, NULL);
 }
 
 void buffer_delete_forward_word(struct buffer *buf, char **out, int *n_out)
 {
-	int p = buf->cursor;
-
-	buffer_move_forward_word(buf);
-	buffer_delete_region(buf, p, buf->cursor, out, n_out);
 }
 
 void buffer_delete_backward_word(struct buffer *buf, char **out, int *n_out)
 {
-	int p = buf->cursor;
-
-	buffer_move_backward_word(buf);
-	buffer_delete_region(buf, buf->cursor, p, out, n_out);
 }
 
 void buffer_delete_region(struct buffer *buf, int beg, int end, char **out, int *n_out)
@@ -624,6 +651,7 @@ void buffer_selection_toggle(struct buffer *buf)
 		buf->sel_start = buf->sel_end = buf->cursor;
 }
 
+/* TODO: must be fixed to keep the selection properly on UTF-8 characters */
 void buffer_selection_update(struct buffer *buf)
 {
 	if (buf->sel_active)
@@ -682,10 +710,12 @@ int str_newlines(const char *str, int n)
 int region_newlines(struct buffer *buf, int beg, int end)
 {
 	int nl = 0, p = beg, way;
+	char c;
 
 	way = beg < end ? 1 : -1;
 	do {
-		if (buffer_data_at(buf, p) == '\n')
+		c = buffer_data_at(buf, p);
+		if (is_utf8(c) && c == '\n')
 			nl++;
 		p += way;
 	} while (is_position_in_region(p, beg, end));
@@ -967,8 +997,8 @@ static void _devel_show_status_line(struct buffer *buf)
 		 buf->name, buf->path, buf->used, buf->size);
 	mvprintw(y+1, 1, "      %s  C:|%d|  CL:|%d|  LL:|%d|  GS:|%d|  GE:|%d|  %s",
 		 mode, buf->cursor, buf->cur_line, buf->last_line, buf->gap_start, buf->gap_end, selection);
-	mvprintw(y+2, 1, "      SS:%d  SE:%d  CC:%d",
-		 editor.screen_start, editor.screen_start + editor.screen_width - 1, buf->cursor_column);
+	mvprintw(y+2, 1, "      SS:%d  SE:%d  CC:%d LINELEN:%d",
+		 editor.screen_start, editor.screen_start + editor.screen_width - 1, buf->cursor_column, buffer_get_line_length(buf));
 	attroff(A_BOLD);
 }
 
@@ -976,6 +1006,7 @@ int main(int argc, char **argv)
 {
 	signal(SIGINT, finish);
 
+	setlocale(LC_ALL, "");
 	initscr();
 	init_colors();
 	raw();
