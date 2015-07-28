@@ -752,7 +752,7 @@ void editor_init(int argc, char *argv[])
 	editor.buf_current = NULL;
 	editor.mode = M_COMMAND;
 	editor.screen_start = 0;
-	editor.screen_width = getmaxy(stdscr) - 5;
+	editor.screen_width = getmaxy(stdscr) - 3;
 	editor.clipboard_len = 0;
 	editor.clipboard = NULL;
 	editor.keybindings = DEFAULT_KEYBINDINGS;
@@ -1240,7 +1240,8 @@ static void _devel_show_status_line(struct buffer *buf)
 	mvprintw(y+1, 1, "      %s  C:|%d|  CL:|%d|  LL:|%d|  GS:|%d|  GE:|%d|  %s",
 		 mode, buf->cursor, buf->cur_line, buf->last_line, buf->gap_start, buf->gap_end, selection);
 	mvprintw(y+2, 1, "      SS:%d  SE:%d  CC:%d LINELEN:%d",
-		 editor.screen_start, editor.screen_start + editor.screen_width - 1, buf->cursor_column, buffer_get_line_length(buf));
+		 editor.screen_start, editor.screen_start + editor.screen_width - 1,
+		 buf->cursor_column, buffer_get_line_length(buf));
 	attroff(A_BOLD);
 }
 
@@ -1261,9 +1262,7 @@ int main(int argc, char **argv)
 		doupdate();
 
 		clear();
-		/* DEVEL */
-		_devel_show_status_line(editor.buf_current);
-
+		/* _devel_show_status_line(editor.buf_current); */
 		editor_show_status_line();
 		editor_update_screen();
 		editor_redisplay();
