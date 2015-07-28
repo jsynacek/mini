@@ -55,6 +55,8 @@ struct keybinding dvorak_keybindings[] = {
 	{'q', M_COMMAND|M_SELECTION, command_delete_selection_or_line},
 	{'k', M_COMMAND, command_paste},
 	{'v', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
+	{'s', M_COMMAND|M_SELECTION, command_search_forward},
+	{'S', M_COMMAND|M_SELECTION, command_search_backward},
 	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
 	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
 	{CTRL('s'), M_ALL, command_save_buffer},
@@ -88,6 +90,8 @@ struct keybinding qwerty_keybindings[] = {
 	{'x', M_COMMAND|M_SELECTION, command_delete_selection_or_line},
 	{'v', M_COMMAND, command_paste},
 	{'.', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
+	{';', M_COMMAND|M_SELECTION, command_search_forward},
+	{':', M_COMMAND|M_SELECTION, command_search_backward},
 	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
 	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
 	{CTRL('s'), M_ALL, command_save_buffer},
@@ -606,6 +610,69 @@ void buffer_selection_update(struct buffer *buf)
 		buf->sel_end = buf->cursor;
 }
 
+/* TODO: searches work from cursor; add a helper search function to utils that is more general */
+int buffer_search_forward(struct buffer *buf, const char *str)
+{
+	char *text, *from, *s;
+	int p = -1;
+
+	text = malloc(buf->used + 1);
+	assert(text);
+	memcpy(text, buf->data, buf->gap_start);
+	memcpy(text + buf->gap_start, buf->data + buf->gap_end, buf->size - buf->gap_end);
+	text[buf->used] = '\0';
+	from = text + buf->cursor;
+	s = strstr(from, str);
+	if (s) {
+		p = s - from;
+		buf->cursor += p;
+		buf->cur_line += str_newlines(from, p);
+	}
+	free(text);
+	buffer_cursor_column_update(buf);
+	buffer_selection_update(buf);
+
+	return p;
+}
+
+int buffer_search_backward(struct buffer *buf, const char *str)
+{
+	char *text, *s;
+	int p = 0;
+
+	text = malloc(buf->used + 1);
+	assert(text);
+	memcpy(text, buf->data, buf->gap_start);
+	memcpy(text + buf->gap_start, buf->data + buf->gap_end, buf->size - buf->gap_end);
+	text[buf->used] = '\0';
+
+	/* TODO: If the stars ever align correctly, this mess should be simplified... */
+	s = strstr(text, str);
+	if (s) {
+		while (1) {
+			int len;
+
+			s = strstr(text + p + 1, str);
+			if (s) {
+				len = s - (text + p);
+				if (p + len < buf->cursor)
+					p += len;
+				else
+					break;
+			} else {
+				break;
+			}
+		}
+		buf->cursor = p;
+		buf->cur_line = str_newlines(text, p);
+	}
+	free(text);
+	buffer_cursor_column_update(buf);
+	buffer_selection_update(buf);
+
+	return p;
+}
+
 void die(const char *fmt, ...)
 {
 	va_list va;
@@ -1050,6 +1117,28 @@ int command_toggle_selection_mode(void)
 		editor.mode = M_SELECTION;
 	else
 		editor.mode = M_COMMAND;
+	return 0;
+}
+
+int command_search_forward(void)
+{
+	char *str;
+
+	str = editor_dialog("Search → ");
+	buffer_search_forward(editor.buf_current, str);
+
+	free(str);
+	return 0;
+}
+
+int command_search_backward(void)
+{
+	char *str;
+
+	str = editor_dialog("Search ← ");
+	buffer_search_backward(editor.buf_current, str);
+
+	free(str);
 	return 0;
 }
 

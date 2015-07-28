@@ -106,6 +106,10 @@ void buffer_delete_selection(struct buffer *buf, char **out, int *n_out);
 void buffer_selection_toggle(struct buffer *buf);
 void buffer_selection_update(struct buffer *buf);
 
+/* Buffer search */
+int buffer_search_forward(struct buffer *buf, const char *str);
+int buffer_search_backward(struct buffer *buf, const char *str);
+
 /* Utils */
 #define is_utf8(c) (((c) & 0xC0) != 0x80)
 bool is_position_in_buffer(int pos, struct buffer *buf);
@@ -175,6 +179,8 @@ int command_delete_backward_word(void);
 int command_delete_selection_or_line(void);
 int command_paste(void);
 int command_toggle_selection_mode(void);
+int command_search_forward(void);
+int command_search_backward(void);
 int command_editor_command_mode(void);
 int command_editor_editing_mode(void);
 int command_save_buffer(void);
