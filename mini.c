@@ -288,7 +288,7 @@ int buffer_get_line_offset(struct buffer *buf)
 {
 	int p, x = 0;
 	char c;
-		
+
 	p = buffer_get_line_beginning(buf);
 
 	while (p < buf->cursor) {
@@ -303,7 +303,7 @@ int buffer_get_line_offset(struct buffer *buf)
 	}
 	return x;
 }
-	
+
 int buffer_get_line_length(struct buffer *buf)
 {
 	int p, end, l = 0;
@@ -399,7 +399,7 @@ void buffer_move_forward_line(struct buffer *buf)
 	int ll, cc;
 
 	cc = buf->cursor_column;
-		
+
 	buffer_move_end_of_line(buf);
 	buffer_move_forward_char(buf);
 
@@ -516,14 +516,14 @@ void buffer_delete_forward_char(struct buffer *buf)
 void buffer_delete_backward_char(struct buffer *buf)
 {
 	int p;
-	
+
 	if (buf->cursor == 0)
 		return;
 
 	p = buf->cursor;
 	while (!is_utf8(buffer_data_at(buf, p - 1)) && (p - 1 < buf->used))
 		    p--;
-	
+
 	buffer_delete_region(buf, buf->cursor - 1, p - 1, NULL, NULL);
 }
 
