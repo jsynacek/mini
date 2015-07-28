@@ -8,6 +8,6 @@ mini: $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $(LDFLAGS) -o $@
 
 clean:
-	rm -f $(OBJECTS)
+	rm -f $(OBJECTS) mini
 
-mini.o: mini.c
+mini.o: mini.c mini.h
