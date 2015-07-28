@@ -33,6 +33,71 @@
 #include "mini.h"
 
 static struct editor editor = {};
+struct keybinding dvorak_keybindings[] = {
+	{'n', M_COMMAND|M_SELECTION, command_move_forward_char},
+	{'h', M_COMMAND|M_SELECTION, command_move_backward_char},
+	{'r', M_COMMAND|M_SELECTION, command_move_forward_word},
+	{'g', M_COMMAND|M_SELECTION, command_move_backward_word},
+	{'t', M_COMMAND|M_SELECTION, command_move_forward_line},
+	{'c', M_COMMAND|M_SELECTION, command_move_backward_line},
+	{'H', M_COMMAND|M_SELECTION, command_move_beginning_of_line},
+	{'N', M_COMMAND|M_SELECTION, command_move_end_of_line},
+	{'C', M_COMMAND|M_SELECTION, command_move_page_up},
+	{'T', M_COMMAND|M_SELECTION, command_move_page_down},
+	{'f', M_COMMAND|M_SELECTION, command_move_beginning_of_buffer},
+	{'d', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
+	{KEY_DC, M_ALL, command_delete_forward_char},
+	{'u', M_COMMAND, command_delete_forward_char},
+	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
+	{'e', M_COMMAND, command_delete_backward_char},
+	{'p', M_COMMAND, command_delete_forward_word},
+	{'.', M_COMMAND, command_delete_backward_word},
+	{'q', M_COMMAND|M_SELECTION, command_delete_selection_or_line},
+	{'k', M_COMMAND, command_paste},
+	{'v', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
+	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
+	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
+	{CTRL('s'), M_ALL, command_save_buffer},
+	{CTRL('w'), M_ALL, command_write_buffer},
+	{CTRL('l'), M_ALL, command_load_buffer},
+	{CTRL('q'), M_ALL, command_editor_quit},
+	{']', M_COMMAND|M_SELECTION, command_next_buffer},
+	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
+	{-1, -1, NULL}
+};
+/* XXX: Testing only */
+struct keybinding qwerty_keybindings[] = {
+	{'l', M_COMMAND|M_SELECTION, command_move_forward_char},
+	{'j', M_COMMAND|M_SELECTION, command_move_backward_char},
+	{'o', M_COMMAND|M_SELECTION, command_move_forward_word},
+	{'u', M_COMMAND|M_SELECTION, command_move_backward_word},
+	{'k', M_COMMAND|M_SELECTION, command_move_forward_line},
+	{'i', M_COMMAND|M_SELECTION, command_move_backward_line},
+	{'J', M_COMMAND|M_SELECTION, command_move_beginning_of_line},
+	{'L', M_COMMAND|M_SELECTION, command_move_end_of_line},
+	{'I', M_COMMAND|M_SELECTION, command_move_page_up},
+	{'K', M_COMMAND|M_SELECTION, command_move_page_down},
+	{'y', M_COMMAND|M_SELECTION, command_move_beginning_of_buffer},
+	{'h', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
+	{KEY_DC, M_ALL, command_delete_forward_char},
+	{'f', M_COMMAND, command_delete_forward_char},
+	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
+	{'d', M_COMMAND, command_delete_backward_char},
+	{'r', M_COMMAND, command_delete_forward_word},
+	{'e', M_COMMAND, command_delete_backward_word},
+	{'x', M_COMMAND|M_SELECTION, command_delete_selection_or_line},
+	{'v', M_COMMAND, command_paste},
+	{'.', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
+	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
+	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
+	{CTRL('s'), M_ALL, command_save_buffer},
+	{CTRL('w'), M_ALL, command_write_buffer},
+	{CTRL('l'), M_ALL, command_load_buffer},
+	{CTRL('q'), M_ALL, command_editor_quit},
+	{']', M_COMMAND|M_SELECTION, command_next_buffer},
+	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
+	{-1, -1, NULL}
+};
 
 struct buffer *buffer_new(void)
 {
@@ -623,6 +688,7 @@ void editor_init(int argc, char *argv[])
 	editor.screen_width = getmaxy(stdscr) - 5;
 	editor.clipboard_len = 0;
 	editor.clipboard = NULL;
+	editor.keybindings = DEFAULT_KEYBINDINGS;
 
 	buf = buffer_new();
 	if (!buf)
@@ -832,6 +898,210 @@ void editor_redisplay(void)
 	move(y + 2, x);
 }
 
+int editor_process_key(int key)
+{
+	int i = 0;
+
+	/* TODO: assert that editor has keybindings */
+	while (editor.keybindings[i].key >= 0) {
+		if (editor.keybindings[i].key == key && editor.keybindings[i].modemask & editor.mode)
+			return editor.keybindings[i].command();
+		i++;
+	}
+	/* Self insert if keybinding wasn't found */
+	if (editor.mode == M_EDITING) {
+		if (key == KEY_ENTER)
+			buffer_insert_char(editor.buf_current, '\n');
+		else
+			buffer_insert_char(editor.buf_current, key);
+	}
+
+	return 0;
+}
+
+/* commands */
+
+int command_move_forward_char(void)
+{
+	buffer_move_forward_char(editor.buf_current);
+	return 0;
+}
+
+int command_move_backward_char(void)
+{
+	buffer_move_backward_char(editor.buf_current);
+	return 0;
+}
+
+int command_move_forward_word(void)
+{
+	buffer_move_forward_word(editor.buf_current);
+	return 0;
+}
+
+int command_move_backward_word(void)
+{
+	buffer_move_backward_word(editor.buf_current);
+	return 0;
+}
+
+int command_move_forward_line(void)
+{
+	buffer_move_forward_line(editor.buf_current);
+	return 0;
+}
+
+int command_move_backward_line(void)
+{
+	buffer_move_backward_line(editor.buf_current);
+	return 0;
+}
+
+int command_move_beginning_of_line(void)
+{
+	buffer_move_beginning_of_line(editor.buf_current);
+	return 0;
+}
+
+int command_move_end_of_line(void)
+{
+	buffer_move_end_of_line(editor.buf_current);
+	return 0;
+}
+
+int command_move_page_up(void)
+{
+	int i;
+
+	for (i = 0; i < editor.screen_width; i++)
+		buffer_move_backward_line(editor.buf_current);
+
+	return 0;
+}
+
+int command_move_page_down(void)
+{
+	int i;
+
+	for (i = 0; i < editor.screen_width; i++)
+		buffer_move_forward_line(editor.buf_current);
+
+	return 0;
+}
+
+int command_move_beginning_of_buffer(void)
+{
+	buffer_move_beginning_of_buffer(editor.buf_current);
+	return 0;
+}
+
+int command_move_end_of_buffer(void)
+{
+	buffer_move_end_of_buffer(editor.buf_current);
+	return 0;
+}
+
+/* TODO: deletions should be smart when in selection mode */
+/* TODO: deletions leak */
+int command_delete_forward_char(void)
+{
+	buffer_delete_forward_char(editor.buf_current);
+	return 0;
+}
+
+int command_delete_backward_char(void)
+{
+	buffer_delete_backward_char(editor.buf_current);
+	return 0;
+}
+
+int command_delete_forward_word(void)
+{
+	buffer_delete_forward_word(editor.buf_current, NULL, NULL);
+	return 0;
+}
+
+int command_delete_backward_word(void)
+{
+	buffer_delete_backward_word(editor.buf_current, NULL, NULL);
+	return 0;
+}
+
+int command_delete_selection_or_line(void)
+{
+	if (editor.buf_current->sel_active)
+		buffer_delete_selection(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
+	else
+		buffer_delete_line(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
+	editor.mode = M_COMMAND;
+	return 0;
+}
+
+int command_paste(void)
+{
+	buffer_insert_string(editor.buf_current, editor.clipboard, editor.clipboard_len);
+	return 0;
+}
+
+int command_toggle_selection_mode(void)
+{
+	buffer_selection_toggle(editor.buf_current);
+	if (editor.buf_current->sel_active)
+		editor.mode = M_SELECTION;
+	else
+		editor.mode = M_COMMAND;
+	return 0;
+}
+
+int command_editor_command_mode(void)
+{
+	editor.mode = M_COMMAND;
+	return 0;
+}
+
+int command_editor_editing_mode(void)
+{
+	editor.mode = M_EDITING;
+	return 0;
+}
+
+int command_save_buffer(void)
+{
+	editor_save(false);
+	return 0;
+}
+
+int command_write_buffer(void)
+{
+	editor_save(true);
+	return 0;
+}
+
+int command_load_buffer(void)
+{
+	editor_load_file();
+	return 0;
+}
+
+int command_next_buffer(void)
+{
+	editor_next_buffer();
+	return 0;
+}
+
+int command_previous_buffer(void)
+{
+	editor_previous_buffer();
+	return 0;
+}
+
+/* Does not return */
+int command_editor_quit(void)
+{
+	endwin();
+	exit(0);
+}
+
 static void init_colors(void)
 {
 	if (has_colors()) {
@@ -899,8 +1169,6 @@ int main(int argc, char **argv)
 	editor_init(argc, argv);
 
 	for (;;) {
-		int c;
-
 		doupdate();
 
 		clear();
@@ -910,94 +1178,6 @@ int main(int argc, char **argv)
 		editor_show_status_line();
 		editor_update_screen();
 		editor_redisplay();
-
-		c = get_input();
-		if (c == CTRL('q'))
-			finish(0);
-		if (editor.mode == M_COMMAND || editor.mode == M_SELECTION) {
-			if (c == 'n')
-				buffer_move_forward_char(editor.buf_current);
-			else if (c == 'h')
-				buffer_move_backward_char(editor.buf_current);
-			else if (c == 'g')
-				buffer_move_backward_word(editor.buf_current);
-			else if (c == 'r')
-				buffer_move_forward_word(editor.buf_current);
-			else if (c == 'N')
-				buffer_move_end_of_line(editor.buf_current);
-			else if (c == 'H')
-				buffer_move_beginning_of_line(editor.buf_current);
-			else if (c == 't')
-				buffer_move_forward_line(editor.buf_current);
-			else if (c == 'c')
-				buffer_move_backward_line(editor.buf_current);
-			else if (c == 'T') {
-				/* TODO: CMD: page down */
-				for (int i = 0; i < editor.screen_width; i++)
-					buffer_move_forward_line(editor.buf_current);
-			}
-			else if (c == 'C') {
-				/* TODO: CMD: page up */
-				for (int i = 0; i < editor.screen_width; i++)
-					buffer_move_backward_line(editor.buf_current);
-			}
-			else if (c == 'd')
-				buffer_move_end_of_buffer(editor.buf_current);
-			else if (c == 'f')
-				buffer_move_beginning_of_buffer(editor.buf_current);
-
-			/* TODO: deletions leak */
-			else if (c == KEY_DC || c == 'u')
-				buffer_delete_forward_char(editor.buf_current);
-			else if (c == KEY_BACKSPACE || c == 'e')
-				buffer_delete_backward_char(editor.buf_current);
-			else if (c == '.')
-				buffer_delete_backward_word(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
-			else if (c == 'p')
-				buffer_delete_forward_word(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
-			else if (c == 'q') {
-				/* TODO: CMD: delete active selection or whole line */
-				if (editor.buf_current->sel_active)
-					buffer_delete_selection(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
-				else
-					buffer_delete_line(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
-			}
-			else if (c == 'k')
-				/* TODO: CMD?: paste */
-				buffer_insert_string(editor.buf_current, editor.clipboard, editor.clipboard_len);
-
-			else if (c == 'v') {
-				buffer_selection_toggle(editor.buf_current);
-				if (editor.buf_current->sel_active)
-					editor.mode = M_SELECTION;
-				else
-					editor.mode = M_COMMAND;
-			}
-
-			else if (c == CTRL('s'))
-				editor_save(false);
-			else if (c == CTRL('w'))
-				editor_save(true);
-			else if (c == CTRL('l'))
-				editor_load_file();
-			else if (c == '[')
-				editor_previous_buffer();
-			else if (c == ']')
-				editor_next_buffer();
-			else if (c == KEY_ENTER)
-				editor.mode = M_EDITING;
-
-		} else if (editor.mode == M_EDITING) {
-			if (c == KEY_ENTER)
-				buffer_insert_char(editor.buf_current, '\n');
-			else if (c == KEY_DC)
-				buffer_delete_forward_char(editor.buf_current);
-			else if (c == KEY_BACKSPACE)
-				buffer_delete_backward_char(editor.buf_current);
-			else if (c == KEY_ESC)
-				editor.mode = M_COMMAND;
-			else
-				buffer_insert_char(editor.buf_current, c);
-		}
+		editor_process_key(get_input());
 	}
 }

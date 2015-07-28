@@ -27,6 +27,7 @@
 #define CTRL_SPACE 0x00
 
 #define TAB_STOP 8
+#define DEFAULT_KEYBINDINGS dvorak_keybindings
 
 #define C_COMMAND 1
 #define C_EDITING 2
@@ -115,19 +116,29 @@ void oom();
 
 /** Editor */
 
+enum mode {
+	M_COMMAND   = 0x1,
+	M_EDITING   = 0x2,
+	M_SELECTION = 0x4,
+	M_ALL = 0x7
+};
+
+struct keybinding {
+	int key;
+	int modemask;
+	int (*command)(void);
+};
+
 struct editor {
 	struct buffer *buf_first;
 	struct buffer *buf_last;
 	struct buffer *buf_current;
-	enum mode {
-		M_COMMAND,
-		M_EDITING,
-		M_SELECTION,
-	} mode;
+	enum mode mode;
 	int screen_start;
 	int screen_width;
 	int clipboard_len;
 	char *clipboard;
+	struct keybinding *keybindings;
 };
 
 void editor_init(int argc, char *argv[]);
@@ -141,5 +152,36 @@ void editor_error(const char *error);
 void editor_show_status_line(void);
 void editor_update_screen(void);
 void editor_redisplay(void);
+int editor_process_key(int key);
+
+/** Commands */
+
+int command_move_forward_char(void);
+int command_move_backward_char(void);
+int command_move_forward_word(void);
+int command_move_backward_word(void);
+int command_move_forward_line(void);
+int command_move_backward_line(void);
+int command_move_beginning_of_line(void);
+int command_move_end_of_line(void);
+int command_move_page_up(void);
+int command_move_page_down(void);
+int command_move_beginning_of_buffer(void);
+int command_move_end_of_buffer(void);
+int command_delete_forward_char(void);
+int command_delete_backward_char(void);
+int command_delete_forward_word(void);
+int command_delete_backward_word(void);
+int command_delete_selection_or_line(void);
+int command_paste(void);
+int command_toggle_selection_mode(void);
+int command_editor_command_mode(void);
+int command_editor_editing_mode(void);
+int command_save_buffer(void);
+int command_write_buffer(void);
+int command_load_buffer(void);
+int command_next_buffer(void);
+int command_previous_buffer(void);
+int command_editor_quit(void);
 
 #endif
