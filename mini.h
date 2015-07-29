@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Jan Synáček
+ * Copyright 2015 Jan Synáček
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -28,11 +28,6 @@
 
 #define TAB_STOP 8
 #define DEFAULT_KEYBINDINGS dvorak_keybindings
-
-#define C_COMMAND 1
-#define C_EDITING 2
-#define C_SELECTION 3
-#define C_ERROR 4
 
 /** Buffer */
 

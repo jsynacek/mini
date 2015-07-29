@@ -31,6 +31,7 @@
 
 #include <curses.h>
 #include "mini.h"
+#include "color.h"
 
 static struct editor editor = {};
 struct keybinding dvorak_keybindings[] = {
@@ -102,6 +103,37 @@ struct keybinding qwerty_keybindings[] = {
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
 	{-1, -1, NULL}
 };
+
+/* Solarized palette. */
+struct color colors[] = {
+	{COLOR_ID_BASE03,  0x00, 0x2b, 0x36},
+	{COLOR_ID_BASE02,  0x07, 0x36, 0x42},
+	{COLOR_ID_BASE01,  0x58, 0x6e, 0x75},
+	{COLOR_ID_BASE00,  0x65, 0x7b, 0x83},
+	{COLOR_ID_BASE0,   0x83, 0x94, 0x96},
+	{COLOR_ID_BASE1,   0x93, 0xa1, 0xa1},
+	{COLOR_ID_BASE2,   0xee, 0xe8, 0xd5},
+	{COLOR_ID_BASE3,   0xfd, 0xf6, 0xe3},
+	{COLOR_ID_YELLOW,  0xb5, 0x89, 0x00},
+	{COLOR_ID_ORANGE,  0xcb, 0x4b, 0x16},
+	{COLOR_ID_RED,     0xdc, 0x32, 0x2f},
+	{COLOR_ID_MAGENTA, 0xd3, 0x36, 0x82},
+	{COLOR_ID_VIOLET,  0x6c, 0x71, 0xc4},
+	{COLOR_ID_BLUE,    0x26, 0x8b, 0xd2},
+	{COLOR_ID_CYAN,    0x2a, 0xa1, 0x98},
+	{COLOR_ID_GREEN,   0x85, 0x99, 0x00},
+	{-1, -1, -1, -1}
+};
+struct color_pair color_pairs[] = {
+	{CP_NORMAL_TEXT,         COLOR_ID_BASE00, -1},
+	{CP_ERROR,               COLOR_ID_RED,    -1},
+	{CP_HIGHLIGHT_SELECTION, COLOR_ID_BASE00,  COLOR_ID_BASE2},
+	{CP_MODE_COMMAND,        COLOR_ID_BLUE,   -1},
+	{CP_MODE_EDITING,        COLOR_ID_GREEN,  -1},
+	{CP_MODE_SELECTION,      COLOR_ID_ORANGE, -1},
+	{-1, -1, -1}
+};
+
 
 struct buffer *buffer_new(void)
 {
@@ -865,11 +897,11 @@ void editor_error(const char *error)
 	   because deleteln() actually moves all lines up by one. */
 	insertln();
 
-	attron(COLOR_PAIR(C_ERROR));
+	attron(COLOR_PAIR(CP_ERROR));
 	attron(A_BOLD);
 	printw(error);
 	attroff(A_BOLD);
-	attroff(COLOR_PAIR(C_ERROR));
+	attroff(COLOR_PAIR(CP_ERROR));
 	getch();
 	curs_set(1);
 }
@@ -883,12 +915,12 @@ void editor_show_status_line(void)
 
 	if (editor.mode == M_COMMAND) {
 		mode = "[C]";
-		attron(COLOR_PAIR(C_COMMAND));
+		attron(COLOR_PAIR(CP_MODE_COMMAND));
 	} else if (editor.mode == M_EDITING) {
 		mode = "[E]";
-		attron(COLOR_PAIR(C_EDITING));
+		attron(COLOR_PAIR(CP_MODE_EDITING));
 	} else {
-		attron(COLOR_PAIR(C_SELECTION));
+		attron(COLOR_PAIR(CP_MODE_SELECTION));
 		mode = "[S]";
 	}
 
@@ -897,9 +929,9 @@ void editor_show_status_line(void)
 	buffer_get_yx(buf, &y, &x);
 	attron(A_BOLD);
 	printw(mode);
-	attroff(COLOR_PAIR(C_SELECTION));
-	attroff(COLOR_PAIR(C_EDITING));
-	attroff(COLOR_PAIR(C_COMMAND));
+	attroff(COLOR_PAIR(CP_MODE_SELECTION));
+	attroff(COLOR_PAIR(CP_MODE_EDITING));
+	attroff(COLOR_PAIR(CP_MODE_COMMAND));
 	printw(" %s %s", buf->name, modified);
 
 	char *s;
@@ -948,7 +980,7 @@ void editor_redisplay(void)
 		c = buffer_data_at(buf, pos);
 
 		if (buf->sel_active && pos >= sel_start && pos <= sel_end)
-			attron(A_REVERSE);
+			attron(COLOR_PAIR(CP_HIGHLIGHT_SELECTION));
 		if (c == '\t') {
 			attron(A_BOLD);
 			is_tab = true;
@@ -957,7 +989,7 @@ void editor_redisplay(void)
 		if (is_tab)
 			attroff(A_BOLD);
 		if (buf->sel_active && pos >= sel_start && pos <= sel_end)
-			attroff(A_REVERSE);
+			attroff(COLOR_PAIR(CP_HIGHLIGHT_SELECTION));
 	}
 
 	buffer_get_yx(buf, &y, &x);
@@ -1191,17 +1223,6 @@ int command_editor_quit(void)
 	exit(0);
 }
 
-static void init_colors(void)
-{
-	if (has_colors()) {
-		start_color();
-		init_pair(C_COMMAND, COLOR_BLUE, COLOR_BLACK);
-		init_pair(C_EDITING, COLOR_GREEN, COLOR_BLACK);
-		init_pair(C_SELECTION, COLOR_YELLOW, COLOR_BLACK);
-		init_pair(C_ERROR, COLOR_RED, COLOR_BLACK);
-	}
-}
-
 static int get_input(void)
 {
 	int c;
@@ -1251,7 +1272,7 @@ int main(int argc, char **argv)
 
 	setlocale(LC_ALL, "");
 	initscr();
-	init_colors();
+	init_colors(colors, color_pairs);
 	raw();
 	noecho();
 	keypad(stdscr, TRUE);
