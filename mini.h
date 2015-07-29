@@ -73,6 +73,9 @@ int buffer_get_line_offset(struct buffer *buf);
 int buffer_get_line_length(struct buffer *buf);
 void buffer_get_region(struct buffer *buf, int line_start, int lines, int *beg, int *end);
 void buffer_get_yx(struct buffer *buf, int *y, int *x);
+int buffer_find_char(struct buffer *buf, int from, int way, const char *accept, int *newlines);
+int buffer_find_next(struct buffer *buf, int from, const char *accept, int *newlines);
+int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *newlines);
 
 /* Buffer movement */
 void buffer_move_forward_char(struct buffer *buf);
@@ -85,6 +88,8 @@ void buffer_move_beginning_of_line(struct buffer *buf);
 void buffer_move_end_of_line(struct buffer *buf);
 void buffer_move_beginning_of_buffer(struct buffer *buf);
 void buffer_move_end_of_buffer(struct buffer *buf);
+void buffer_move_forward_bracket(struct buffer *buf);
+void buffer_move_backward_bracket(struct buffer *buf);
 
 /* Buffer insertion and deletion */
 void buffer_insert_char(struct buffer *buf, const char c);
@@ -167,6 +172,8 @@ int command_move_page_up(void);
 int command_move_page_down(void);
 int command_move_beginning_of_buffer(void);
 int command_move_end_of_buffer(void);
+int command_move_forward_bracket(void);
+int command_move_backward_bracket(void);
 int command_delete_forward_char(void);
 int command_delete_backward_char(void);
 int command_delete_forward_word(void);

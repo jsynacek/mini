@@ -47,6 +47,8 @@ struct keybinding dvorak_keybindings[] = {
 	{'T', M_COMMAND|M_SELECTION, command_move_page_down},
 	{'f', M_COMMAND|M_SELECTION, command_move_beginning_of_buffer},
 	{'d', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
+	{'R', M_COMMAND|M_SELECTION, command_move_forward_bracket},
+	{'G', M_COMMAND|M_SELECTION, command_move_backward_bracket},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'u', M_COMMAND, command_delete_forward_char},
 	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
@@ -82,6 +84,8 @@ struct keybinding qwerty_keybindings[] = {
 	{'K', M_COMMAND|M_SELECTION, command_move_page_down},
 	{'y', M_COMMAND|M_SELECTION, command_move_beginning_of_buffer},
 	{'h', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
+	{'O', M_COMMAND|M_SELECTION, command_move_forward_bracket},
+	{'U', M_COMMAND|M_SELECTION, command_move_backward_bracket},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'f', M_COMMAND, command_delete_forward_char},
 	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
@@ -383,6 +387,52 @@ void buffer_get_yx(struct buffer *buf, int *y, int *x)
 	*x = buffer_get_line_offset(buf);
 }
 
+/* TODO: util functions needed for buffer operations: */
+/* strstr() and reverse */
+
+/* TODO: buffer_find_char() and friends could be used to find newlines in text as well. */
+
+/* Find the next occurence of any of the characters specified in "accept".
+ * Start at "from", go forward if "way" is positive or backward if negative.
+ * Number of lines passed is returned in "newlines".
+ * Return a position of the first found character, or -1 if not found.
+ */
+int buffer_find_char(struct buffer *buf, int from, int way, const char *accept, int *newlines)
+{
+	int p = from;
+
+	if (!is_position_in_buffer(p, buf))
+		return -1;
+
+	*newlines = 0;
+	while (is_position_in_buffer(p, buf)) {
+		const char *a = accept;
+		char c;
+
+		c = buffer_data_at(buf, p);
+		while (*a != '\0') {
+			if (*a++ == c)
+				return p;
+		}
+		if (c == '\n')
+			(*newlines)++;
+		p += way;
+	}
+
+	return -1;
+}
+
+int buffer_find_next(struct buffer *buf, int from, const char *accept, int *newlines)
+{
+	return buffer_find_char(buf, from, 1, accept, newlines);
+}
+
+int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *newlines)
+{
+	return buffer_find_char(buf, from, -1, accept, newlines);
+}
+
+
 static void buffer_cursor_column_update(struct buffer *buf)
 {
 	buf->cursor_column = buffer_get_line_offset(buf);
@@ -503,6 +553,30 @@ void buffer_move_end_of_buffer(struct buffer *buf)
 	buf->cur_line = buf->last_line;
 	buffer_cursor_column_update(buf);
 	buffer_selection_update(buf);
+}
+
+void buffer_move_forward_bracket(struct buffer *buf)
+{
+	int p, nl;
+
+	p = buffer_find_next(buf, buf->cursor + 1, "([{<", &nl);
+	if (p >= 0) {
+		if (buffer_data_at(buf, buf->cursor) == '\n')
+			nl++;
+		buf->cursor = p;
+		buf->cur_line += nl;
+	}
+}
+
+void buffer_move_backward_bracket(struct buffer *buf)
+{
+	int p, nl;
+
+	p = buffer_find_previous(buf, buf->cursor - 1, ")]}>", &nl);
+	if (p >= 0) {
+		buf->cursor = p;
+		buf->cur_line -= nl;
+	}
 }
 
 void buffer_insert_char(struct buffer *buf, const char c)
@@ -1097,6 +1171,18 @@ int command_move_beginning_of_buffer(void)
 int command_move_end_of_buffer(void)
 {
 	buffer_move_end_of_buffer(editor.buf_current);
+	return 0;
+}
+
+int command_move_forward_bracket(void)
+{
+	buffer_move_forward_bracket(editor.buf_current);
+	return 0;
+}
+
+int command_move_backward_bracket(void)
+{
+	buffer_move_backward_bracket(editor.buf_current);
 	return 0;
 }
 
