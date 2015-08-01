@@ -50,6 +50,7 @@ struct keybinding dvorak_keybindings[] = {
 	{'d', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
 	{'R', M_COMMAND|M_SELECTION, command_move_forward_bracket},
 	{'G', M_COMMAND|M_SELECTION, command_move_backward_bracket},
+	{'b', M_COMMAND|M_SELECTION, command_goto_line},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'u', M_COMMAND, command_delete_forward_char},
 	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
@@ -87,6 +88,7 @@ struct keybinding qwerty_keybindings[] = {
 	{'h', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
 	{'O', M_COMMAND|M_SELECTION, command_move_forward_bracket},
 	{'U', M_COMMAND|M_SELECTION, command_move_backward_bracket},
+	{'n', M_COMMAND|M_SELECTION, command_goto_line},
 	{CTRL('u'), M_COMMAND|M_EDITING, command_insert_unicode},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'f', M_COMMAND, command_delete_forward_char},
@@ -579,6 +581,38 @@ void buffer_move_backward_bracket(struct buffer *buf)
 		buf->cursor = p;
 		buf->cur_line -= nl;
 	}
+}
+
+void buffer_goto_line(struct buffer *buf, int line)
+{
+	int p = 0, nl = 0, l = line, lastp;
+
+	if (line < 0)
+		return;
+
+	while (l >= 0) {
+		int tmp;
+
+		lastp = p;
+		p = buffer_find_next(buf, p, "\n", &tmp);
+		if (p < 0)
+			break;
+		else {
+			buf->cursor = p;
+			buf->cursor = buffer_get_line_beginning(buf);
+			buf->cur_line = nl;
+		}
+		l--;
+		nl++;
+		p++;
+	}
+	if (p < 0 && line != 0) {
+		buf->cursor = lastp;
+		buf->cur_line = buf->last_line;
+	}
+
+	buffer_cursor_column_update(buf);
+	buffer_selection_update(buf);
 }
 
 void buffer_insert_char(struct buffer *buf, const char c)
@@ -1203,6 +1237,18 @@ int command_insert_unicode(void)
 int command_move_backward_bracket(void)
 {
 	buffer_move_backward_bracket(editor.buf_current);
+	return 0;
+}
+
+int command_goto_line(void)
+{
+	char *str;
+
+	str = editor_dialog("Goto line: ");
+	/* TODO: This should be improved to handle invalid input. */
+	buffer_goto_line(editor.buf_current, atoi(str));
+
+	free(str);
 	return 0;
 }
 

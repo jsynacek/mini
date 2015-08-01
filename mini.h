@@ -90,6 +90,7 @@ void buffer_move_beginning_of_buffer(struct buffer *buf);
 void buffer_move_end_of_buffer(struct buffer *buf);
 void buffer_move_forward_bracket(struct buffer *buf);
 void buffer_move_backward_bracket(struct buffer *buf);
+void buffer_goto_line(struct buffer *buf, int line);
 
 /* Buffer insertion and deletion */
 void buffer_insert_char(struct buffer *buf, const char c);
@@ -173,6 +174,7 @@ int command_move_beginning_of_buffer(void);
 int command_move_end_of_buffer(void);
 int command_move_forward_bracket(void);
 int command_move_backward_bracket(void);
+int command_goto_line(void);
 int command_insert_unicode(void);
 int command_delete_forward_char(void);
 int command_delete_backward_char(void);
