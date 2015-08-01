@@ -111,7 +111,6 @@ int buffer_search_forward(struct buffer *buf, const char *str);
 int buffer_search_backward(struct buffer *buf, const char *str);
 
 /* Utils */
-static inline bool is_utf8(char c) { return (c & 0xC0) != 0x80; }
 bool is_position_in_buffer(int pos, struct buffer *buf);
 bool is_position_in_region(int pos, int beg, int end);
 int str_newlines(const char *str, int n);

@@ -32,6 +32,7 @@
 #include <curses.h>
 #include "mini.h"
 #include "color.h"
+#include "utf8.h"
 
 static struct editor editor = {};
 struct keybinding dvorak_keybindings[] = {
