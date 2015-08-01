@@ -74,6 +74,7 @@ struct keybinding dvorak_keybindings[] = {
 	{CTRL('q'), M_ALL, command_editor_quit},
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
+	{CTRL('l'), M_ALL, command_recenter},
 	{-1, -1, NULL}
 };
 /* XXX: Testing only */
@@ -116,6 +117,7 @@ struct keybinding qwerty_keybindings[] = {
 	{CTRL('q'), M_ALL, command_editor_quit},
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
+	{CTRL('l'), M_ALL, command_recenter},
 	{-1, -1, NULL}
 };
 
@@ -1405,6 +1407,12 @@ int command_next_buffer(void)
 int command_previous_buffer(void)
 {
 	editor_previous_buffer();
+	return 0;
+}
+
+int command_recenter(void)
+{
+	editor.screen_start = max(0, editor.buf_current->cur_line - editor.screen_width / 2 + 2);
 	return 0;
 }
 

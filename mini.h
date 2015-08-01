@@ -196,6 +196,7 @@ int command_write_buffer(void);
 int command_load_buffer(void);
 int command_next_buffer(void);
 int command_previous_buffer(void);
+int command_recenter(void);
 int command_editor_quit(void);
 
 #endif
