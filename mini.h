@@ -102,6 +102,7 @@ void buffer_delete_backward_word(struct buffer *buf, char **out, int *n_out);
 void buffer_delete_region(struct buffer *buf, int beg, int end, char **out, int *n_out);
 void buffer_delete_line(struct buffer *buf, char **out, int *n_out);
 void buffer_delete_selection(struct buffer *buf, char **out, int *n_out);
+void buffer_clear(struct buffer *buf);
 
 /* Buffer selection */
 void buffer_selection_toggle(struct buffer *buf);
@@ -183,6 +184,7 @@ int command_delete_backward_char(void);
 int command_delete_forward_word(void);
 int command_delete_backward_word(void);
 int command_delete_selection_or_line(void);
+int command_clear(void);
 int command_paste(void);
 int command_toggle_selection_mode(void);
 int command_search_forward(void);

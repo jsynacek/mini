@@ -61,6 +61,7 @@ struct keybinding dvorak_keybindings[] = {
 	{'p', M_COMMAND, command_delete_forward_word},
 	{'.', M_COMMAND, command_delete_backward_word},
 	{'q', M_COMMAND|M_SELECTION, command_delete_selection_or_line},
+	{'Q', M_COMMAND|M_EDITING, command_clear},
 	{'k', M_COMMAND, command_paste},
 	{'v', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
 	{'s', M_COMMAND|M_SELECTION, command_search_forward},
@@ -102,6 +103,7 @@ struct keybinding qwerty_keybindings[] = {
 	{'r', M_COMMAND, command_delete_forward_word},
 	{'e', M_COMMAND, command_delete_backward_word},
 	{'x', M_COMMAND|M_SELECTION, command_delete_selection_or_line},
+	{'X', M_COMMAND|M_EDITING, command_clear},
 	{'v', M_COMMAND, command_paste},
 	{'.', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
 	{';', M_COMMAND|M_SELECTION, command_search_forward},
@@ -742,6 +744,16 @@ void buffer_delete_selection(struct buffer *buf, char **out, int *n_out)
 	}
 }
 
+void buffer_clear(struct buffer *buf)
+{
+	buf->used = 0;
+	buf->gap_start = 0;
+	buf->gap_end = buf->size;
+	buf->cursor = 0;
+	buf->cur_line = 0;
+	buf->last_line = 0;
+}
+
 void buffer_selection_toggle(struct buffer *buf)
 {
 	buf->sel_active = !buf->sel_active;
@@ -1307,6 +1319,12 @@ int command_delete_selection_or_line(void)
 	else
 		buffer_delete_line(editor.buf_current, &editor.clipboard, &editor.clipboard_len);
 	editor.mode = M_COMMAND;
+	return 0;
+}
+
+int command_clear(void)
+{
+	buffer_clear(editor.buf_current);
 	return 0;
 }
 
