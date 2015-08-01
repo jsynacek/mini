@@ -51,6 +51,8 @@ struct keybinding dvorak_keybindings[] = {
 	{'R', M_COMMAND|M_SELECTION, command_move_forward_bracket},
 	{'G', M_COMMAND|M_SELECTION, command_move_backward_bracket},
 	{'b', M_COMMAND|M_SELECTION, command_goto_line},
+	{'o', M_COMMAND, command_open_below},
+	{'O', M_COMMAND, command_open_above},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'u', M_COMMAND, command_delete_forward_char},
 	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
@@ -90,6 +92,8 @@ struct keybinding qwerty_keybindings[] = {
 	{'U', M_COMMAND|M_SELECTION, command_move_backward_bracket},
 	{'n', M_COMMAND|M_SELECTION, command_goto_line},
 	{CTRL('u'), M_COMMAND|M_EDITING, command_insert_unicode},
+	{'s', M_COMMAND, command_open_below},
+	{'S', M_COMMAND, command_open_above},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'f', M_COMMAND, command_delete_forward_char},
 	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
@@ -1231,6 +1235,23 @@ int command_insert_unicode(void)
 		editor_error("Invalid unicode value");
 
 	free(str);
+	return 0;
+}
+
+int command_open_below(void)
+{
+	buffer_move_end_of_line(editor.buf_current);
+	buffer_insert_string(editor.buf_current, "\n", 1);
+	editor.mode = M_EDITING;
+	return 0;
+}
+
+int command_open_above(void)
+{
+	buffer_move_beginning_of_line(editor.buf_current);
+	buffer_insert_string(editor.buf_current, "\n", 1);
+	buffer_move_backward_char(editor.buf_current);
+	editor.mode = M_EDITING;
 	return 0;
 }
 

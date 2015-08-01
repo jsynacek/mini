@@ -176,6 +176,8 @@ int command_move_forward_bracket(void);
 int command_move_backward_bracket(void);
 int command_goto_line(void);
 int command_insert_unicode(void);
+int command_open_below(void);
+int command_open_above(void);
 int command_delete_forward_char(void);
 int command_delete_backward_char(void);
 int command_delete_forward_word(void);
