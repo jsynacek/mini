@@ -51,6 +51,7 @@ struct keybinding dvorak_keybindings[] = {
 	{'R', M_COMMAND|M_SELECTION, command_move_forward_bracket},
 	{'G', M_COMMAND|M_SELECTION, command_move_backward_bracket},
 	{'b', M_COMMAND|M_SELECTION, command_goto_line},
+	{CTRL('u'), M_COMMAND|M_EDITING, command_insert_unicode},
 	{'o', M_COMMAND, command_open_below},
 	{'O', M_COMMAND, command_open_above},
 	{KEY_DC, M_ALL, command_delete_forward_char},
