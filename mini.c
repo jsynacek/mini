@@ -87,6 +87,7 @@ struct keybinding qwerty_keybindings[] = {
 	{'h', M_COMMAND|M_SELECTION, command_move_end_of_buffer},
 	{'O', M_COMMAND|M_SELECTION, command_move_forward_bracket},
 	{'U', M_COMMAND|M_SELECTION, command_move_backward_bracket},
+	{CTRL('u'), M_COMMAND|M_EDITING, command_insert_unicode},
 	{KEY_DC, M_ALL, command_delete_forward_char},
 	{'f', M_COMMAND, command_delete_forward_char},
 	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
@@ -1178,6 +1179,24 @@ int command_move_end_of_buffer(void)
 int command_move_forward_bracket(void)
 {
 	buffer_move_forward_bracket(editor.buf_current);
+	return 0;
+}
+
+int command_insert_unicode(void)
+{
+	char *str;
+	unsigned char utf8[4];
+	int len;
+
+	str = editor_dialog("Unicode U+");
+	/* TODO: This should be improved to handle invalid input. */
+	len = unicode_to_utf8(strtol(str, NULL, 16), utf8);
+	if (len > 0)
+		buffer_insert_string(editor.buf_current, (const char *)utf8, len);
+	else
+		editor_error("Invalid unicode value");
+
+	free(str);
 	return 0;
 }
 

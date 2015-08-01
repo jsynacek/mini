@@ -173,6 +173,7 @@ int command_move_beginning_of_buffer(void);
 int command_move_end_of_buffer(void);
 int command_move_forward_bracket(void);
 int command_move_backward_bracket(void);
+int command_insert_unicode(void);
 int command_delete_forward_char(void);
 int command_delete_backward_char(void);
 int command_delete_forward_word(void);
