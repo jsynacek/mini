@@ -1576,30 +1576,6 @@ static void finish(int sig)
 	exit(0);
 }
 
-static void _devel_show_status_line(struct buffer *buf)
-{
-	int y;
-	const char *mode =
-		(editor.mode == M_COMMAND) ? "[C]" :
-		(editor.mode == M_EDITING) ? "[E]" :
-		"[S]";
-
-	char *selection = NULL;
-
-	if (buf->sel_active)
-		asprintf(&selection, "SS:|%d|  SE:|%d|", buf->sel_start, buf->sel_end);
-	y = getmaxy(stdscr) - 3;
-	attron(A_BOLD);
-	mvprintw(y, 1,   "*DEV* buf->name:|%s|  buf->path:|%s|  buf->used:|%d|  buf->size:|%d|",
-		 buf->name, buf->path, buf->used, buf->size);
-	mvprintw(y+1, 1, "      %s  C:|%d|  CL:|%d|  LL:|%d|  GS:|%d|  GE:|%d|  %s",
-		 mode, buf->cursor, buf->cur_line, buf->last_line, buf->gap_start, buf->gap_end, selection);
-	mvprintw(y+2, 1, "      SS:%d  SE:%d  CC:%d LINELEN:%d",
-		 editor.screen_start, editor.screen_start + editor.screen_width - 1,
-		 buf->cursor_column, buffer_get_line_length(buf));
-	attroff(A_BOLD);
-}
-
 int main(int argc, char **argv)
 {
 	signal(SIGINT, finish);
@@ -1617,7 +1593,6 @@ int main(int argc, char **argv)
 		doupdate();
 
 		clear();
-		/* _devel_show_status_line(editor.buf_current); */
 		editor_show_status_line();
 		editor_update_screen();
 		editor_redisplay();
