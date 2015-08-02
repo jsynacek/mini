@@ -23,6 +23,8 @@
 /** General */
 
 #define KEY_ESC 0x1b
+/* KEY_ANY keybindings have to be ordered *after* everything else, they are a catch-all. */
+#define KEY_ANY 0xff
 #define CTRL(c) ((c) - 0x60)
 #define CTRL_SPACE 0x00
 
@@ -73,6 +75,7 @@ int buffer_get_line_offset(struct buffer *buf);
 int buffer_get_line_length(struct buffer *buf);
 void buffer_get_region(struct buffer *buf, int line_start, int lines, int *beg, int *end);
 void buffer_get_yx(struct buffer *buf, int *y, int *x);
+char *buffer_get_content(struct buffer *buf);
 int buffer_find_char(struct buffer *buf, int from, int way, const char *accept, int *newlines);
 int buffer_find_next(struct buffer *buf, int from, const char *accept, int *newlines);
 int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *newlines);
@@ -113,6 +116,7 @@ int buffer_search_forward(struct buffer *buf, const char *str);
 int buffer_search_backward(struct buffer *buf, const char *str);
 
 /* Utils */
+static inline int max(int a, int b) { return ((a > b) ? a : b); }
 bool is_position_in_buffer(int pos, struct buffer *buf);
 bool is_position_in_region(int pos, int beg, int end);
 int str_newlines(const char *str, int n);
@@ -125,7 +129,18 @@ enum mode {
 	M_COMMAND   = 0x1,
 	M_EDITING   = 0x2,
 	M_SELECTION = 0x4,
-	M_ALL = 0x7
+	M_ALL_BASIC = 0xff,
+
+	M_MINIBUFFER = 0xff00,
+	M_ALL = 0xffff
+};
+
+struct minibuffer {
+	char *prompt;
+	struct buffer *buf;
+	void (*action_cb)(void);
+	void (*update_cb)(void);
+	void (*cancel_cb)(void);
 };
 
 struct keybinding {
@@ -138,11 +153,15 @@ struct editor {
 	struct buffer *buf_first;
 	struct buffer *buf_last;
 	struct buffer *buf_current;
+	struct minibuffer minibuf;
 	enum mode mode;
 	int screen_start;
 	int screen_width;
 	int clipboard_len;
 	char *clipboard;
+	int cursor_last;
+	int line_last;
+	int key_last;
 	struct keybinding *keybindings;
 };
 
@@ -197,6 +216,11 @@ int command_load_buffer(void);
 int command_next_buffer(void);
 int command_previous_buffer(void);
 int command_recenter(void);
+int command_minibuffer_do_action(void);
+int command_minibuffer_delete_backward_char(void);
+int command_minibuffer_clear(void);
+int command_minibuffer_insert_self_and_update(void);
+int command_minibuffer_cancel(void);
 int command_editor_quit(void);
 
 #endif

@@ -54,9 +54,9 @@ struct keybinding dvorak_keybindings[] = {
 	{CTRL('u'), M_COMMAND|M_EDITING, command_insert_unicode},
 	{'o', M_COMMAND, command_open_below},
 	{'O', M_COMMAND, command_open_above},
-	{KEY_DC, M_ALL, command_delete_forward_char},
+	{KEY_DC, M_ALL_BASIC, command_delete_forward_char},
 	{'u', M_COMMAND, command_delete_forward_char},
-	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
+	{KEY_BACKSPACE, M_ALL_BASIC, command_delete_backward_char},
 	{'e', M_COMMAND, command_delete_backward_char},
 	{'p', M_COMMAND, command_delete_forward_word},
 	{'.', M_COMMAND, command_delete_backward_word},
@@ -68,13 +68,19 @@ struct keybinding dvorak_keybindings[] = {
 	{'S', M_COMMAND|M_SELECTION, command_search_backward},
 	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
 	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
-	{CTRL('s'), M_ALL, command_save_buffer},
-	{CTRL('w'), M_ALL, command_write_buffer},
-	{CTRL('o'), M_ALL, command_load_buffer},
-	{CTRL('q'), M_ALL, command_editor_quit},
+	{CTRL('s'), M_ALL_BASIC, command_save_buffer},
+	{CTRL('w'), M_ALL_BASIC, command_write_buffer},
+	{CTRL('o'), M_ALL_BASIC, command_load_buffer},
+	{CTRL('q'), M_ALL_BASIC, command_editor_quit},
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
-	{CTRL('l'), M_ALL, command_recenter},
+	{CTRL('l'), M_ALL_BASIC, command_recenter},
+	/* Minibuffer. */
+	{KEY_ENTER, M_MINIBUFFER, command_minibuffer_do_action},
+	{KEY_BACKSPACE, M_MINIBUFFER, command_minibuffer_delete_backward_char},
+	{CTRL('x'), M_MINIBUFFER, command_minibuffer_clear},
+	{KEY_ESC, M_MINIBUFFER, command_minibuffer_cancel},
+	{KEY_ANY, M_MINIBUFFER, command_minibuffer_insert_self_and_update},
 	{-1, -1, NULL}
 };
 /* XXX: Testing only */
@@ -97,9 +103,9 @@ struct keybinding qwerty_keybindings[] = {
 	{CTRL('u'), M_COMMAND|M_EDITING, command_insert_unicode},
 	{'s', M_COMMAND, command_open_below},
 	{'S', M_COMMAND, command_open_above},
-	{KEY_DC, M_ALL, command_delete_forward_char},
+	{KEY_DC, M_ALL_BASIC, command_delete_forward_char},
 	{'f', M_COMMAND, command_delete_forward_char},
-	{KEY_BACKSPACE, M_ALL, command_delete_backward_char},
+	{KEY_BACKSPACE, M_ALL_BASIC, command_delete_backward_char},
 	{'d', M_COMMAND, command_delete_backward_char},
 	{'r', M_COMMAND, command_delete_forward_word},
 	{'e', M_COMMAND, command_delete_backward_word},
@@ -111,13 +117,19 @@ struct keybinding qwerty_keybindings[] = {
 	{':', M_COMMAND|M_SELECTION, command_search_backward},
 	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
 	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
-	{CTRL('s'), M_ALL, command_save_buffer},
-	{CTRL('w'), M_ALL, command_write_buffer},
-	{CTRL('o'), M_ALL, command_load_buffer},
+	{CTRL('s'), M_ALL_BASIC, command_save_buffer},
+	{CTRL('w'), M_ALL_BASIC, command_write_buffer},
+	{CTRL('o'), M_ALL_BASIC, command_load_buffer},
 	{CTRL('q'), M_ALL, command_editor_quit},
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
-	{CTRL('l'), M_ALL, command_recenter},
+	{CTRL('l'), M_ALL_BASIC, command_recenter},
+	/* Minibuffer. */
+	{KEY_ENTER, M_MINIBUFFER, command_minibuffer_do_action},
+	{KEY_BACKSPACE, M_MINIBUFFER, command_minibuffer_delete_backward_char},
+	{CTRL('x'), M_MINIBUFFER, command_minibuffer_clear},
+	{KEY_ESC, M_MINIBUFFER, command_minibuffer_cancel},
+	{KEY_ANY, M_MINIBUFFER, command_minibuffer_insert_self_and_update},
 	{-1, -1, NULL}
 };
 
@@ -398,6 +410,20 @@ void buffer_get_yx(struct buffer *buf, int *y, int *x)
 {
 	*y = buf->cur_line;
 	*x = buffer_get_line_offset(buf);
+}
+
+char *buffer_get_content(struct buffer *buf)
+{
+	char *text;
+
+	text = malloc(buf->used + 1);
+	if (!text)
+		oom();
+	memcpy(text, buf->data, buf->gap_start);
+	memcpy(text + buf->gap_start, buf->data + buf->gap_end, buf->size - buf->gap_end);
+	text[buf->used] = '\0';
+
+	return text;
 }
 
 /* TODO: util functions needed for buffer operations: */
@@ -916,6 +942,9 @@ void editor_init(int argc, char *argv[])
 	editor.screen_width = getmaxy(stdscr) - 3;
 	editor.clipboard_len = 0;
 	editor.clipboard = NULL;
+	editor.cursor_last = 0;
+	editor.line_last = 0;
+	editor.key_last = 0;
 	editor.keybindings = DEFAULT_KEYBINDINGS;
 
 	buf = buffer_new();
@@ -932,6 +961,16 @@ void editor_init(int argc, char *argv[])
 	buffer_move_beginning_of_buffer(buf);
 	editor_add_buffer(buf);
 	editor.buf_current = buf;
+
+	/* Special-purpose minibuffer. Can't be accessed directly. */
+	buf = buffer_new();
+	if (!buf)
+		oom();
+	editor.minibuf.prompt = NULL;
+	editor.minibuf.buf = buf;
+	editor.minibuf.action_cb = NULL;
+	editor.minibuf.update_cb = NULL;
+	editor.minibuf.cancel_cb = NULL;
 }
 
 void editor_add_buffer(struct buffer *buf)
@@ -1048,9 +1087,11 @@ void editor_show_status_line(void)
 	} else if (editor.mode == M_EDITING) {
 		mode = "[E]";
 		attron(COLOR_PAIR(CP_MODE_EDITING));
-	} else {
+	} else if (editor.mode == M_SELECTION) {
 		attron(COLOR_PAIR(CP_MODE_SELECTION));
 		mode = "[S]";
+	} else {
+		mode = "[M]";
 	}
 
 	move(1, 0);
@@ -1089,6 +1130,18 @@ void editor_redisplay(void)
 	int sel_start, sel_end, display_start, display_end, pos;
 	int y, x;
 	char c;
+
+	if (editor.mode & M_MINIBUFFER) {
+		char *text;
+
+		text = buffer_get_content(editor.minibuf.buf);
+		move(0, 0);
+		attron(A_BOLD);
+		printw(editor.minibuf.prompt);
+		attroff(A_BOLD);
+		printw(text);
+		free(text);
+	}
 
 	/* TODO: During selection, this should be automatically handled */
 	if (buf->sel_active && buf->sel_start < buf->sel_end) {
@@ -1130,10 +1183,14 @@ int editor_process_key(int key)
 {
 	int i = 0;
 
+	editor.key_last = key;
 	/* TODO: assert that editor has keybindings */
 	while (editor.keybindings[i].key >= 0) {
-		if (editor.keybindings[i].key == key && editor.keybindings[i].modemask & editor.mode)
+		if ((editor.keybindings[i].key == key || editor.keybindings[i].key == KEY_ANY)
+		    && editor.keybindings[i].modemask & editor.mode)
+		{
 			return editor.keybindings[i].command();
+		}
 		i++;
 	}
 	/* Self insert if keybinding wasn't found */
@@ -1276,15 +1333,43 @@ int command_move_backward_bracket(void)
 	return 0;
 }
 
+static void goto_line_action(void)
+{
+	char *text;
+
+	text = buffer_get_content(editor.minibuf.buf);
+
+	if (editor.minibuf.buf->used == 0) {
+		editor.buf_current->cursor = editor.cursor_last;
+		editor.buf_current->cur_line = editor.line_last;
+	} else {
+		buffer_goto_line(editor.buf_current, atoi(text));
+	}
+	editor.mode = M_COMMAND;
+}
+static void goto_line_update(void)
+{
+	goto_line_action();
+	command_recenter();
+	editor.mode = M_MINIBUFFER;
+}
+static void goto_line_cancel(void)
+{
+	editor.mode = M_COMMAND;
+	editor.buf_current->cursor = editor.cursor_last;
+	editor.buf_current->cur_line = editor.line_last;
+	command_recenter();
+}
 int command_goto_line(void)
 {
-	char *str;
-
-	str = editor_dialog("Goto line: ");
-	/* TODO: This should be improved to handle invalid input. */
-	buffer_goto_line(editor.buf_current, atoi(str));
-
-	free(str);
+	buffer_clear(editor.minibuf.buf);
+	editor.cursor_last = editor.buf_current->cursor;
+	editor.line_last = editor.buf_current->cur_line;
+	editor.mode = M_MINIBUFFER;
+	editor.minibuf.prompt = "Line → ";
+	editor.minibuf.action_cb = goto_line_action;
+	editor.minibuf.update_cb = goto_line_update;
+	editor.minibuf.cancel_cb = goto_line_cancel;
 	return 0;
 }
 
@@ -1413,6 +1498,44 @@ int command_previous_buffer(void)
 int command_recenter(void)
 {
 	editor.screen_start = max(0, editor.buf_current->cur_line - editor.screen_width / 2 + 2);
+	return 0;
+}
+
+int command_minibuffer_do_action(void)
+{
+	if (editor.minibuf.action_cb)
+		editor.minibuf.action_cb();
+	return 0;
+}
+
+int command_minibuffer_delete_backward_char(void)
+{
+	buffer_delete_backward_char(editor.minibuf.buf);
+	if (editor.minibuf.update_cb)
+		editor.minibuf.update_cb();
+	return 0;
+}
+
+int command_minibuffer_clear(void)
+{
+	buffer_clear(editor.minibuf.buf);
+	if (editor.minibuf.update_cb)
+		editor.minibuf.update_cb();
+	return 0;
+}
+
+int command_minibuffer_insert_self_and_update(void)
+{
+	buffer_insert_char(editor.minibuf.buf, editor.key_last);
+	if (editor.minibuf.update_cb)
+		editor.minibuf.update_cb();
+	return 0;
+}
+
+int command_minibuffer_cancel(void)
+{
+	if (editor.minibuf.cancel_cb)
+		editor.minibuf.cancel_cb();
 	return 0;
 }
 
