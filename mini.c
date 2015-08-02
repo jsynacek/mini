@@ -1356,6 +1356,7 @@ static void goto_line_action(void)
 	} else {
 		buffer_goto_line(editor.buf_current, atoi(text));
 	}
+	free(text);
 	editor.mode = M_COMMAND;
 }
 static void goto_line_update(void)
