@@ -75,6 +75,9 @@ struct keybinding dvorak_keybindings[] = {
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
 	{CTRL('l'), M_ALL_BASIC, command_recenter},
+	/* Self insertion. */
+	{KEY_ENTER, M_EDITING, command_insert_newline},
+	{KEY_ANY, M_EDITING, command_insert_self},
 	/* Minibuffer. */
 	{KEY_ENTER, M_MINIBUFFER, command_minibuffer_do_action},
 	{KEY_BACKSPACE, M_MINIBUFFER, command_minibuffer_delete_backward_char},
@@ -124,6 +127,9 @@ struct keybinding qwerty_keybindings[] = {
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
 	{CTRL('l'), M_ALL_BASIC, command_recenter},
+	/* Self insertion. */
+	{KEY_ENTER, M_EDITING, command_insert_newline},
+	{KEY_ANY, M_EDITING, command_insert_self},
 	/* Minibuffer. */
 	{KEY_ENTER, M_MINIBUFFER, command_minibuffer_do_action},
 	{KEY_BACKSPACE, M_MINIBUFFER, command_minibuffer_delete_backward_char},
@@ -1193,13 +1199,6 @@ int editor_process_key(int key)
 		}
 		i++;
 	}
-	/* Self insert if keybinding wasn't found */
-	if (editor.mode == M_EDITING) {
-		if (key == KEY_ENTER)
-			buffer_insert_char(editor.buf_current, '\n');
-		else
-			buffer_insert_char(editor.buf_current, key);
-	}
 
 	return 0;
 }
@@ -1289,6 +1288,18 @@ int command_move_end_of_buffer(void)
 int command_move_forward_bracket(void)
 {
 	buffer_move_forward_bracket(editor.buf_current);
+	return 0;
+}
+
+int command_insert_newline(void)
+{
+	buffer_insert_char(editor.buf_current, '\n');
+	return 0;
+}
+
+int command_insert_self(void)
+{
+	buffer_insert_char(editor.buf_current, editor.key_last);
 	return 0;
 }
 

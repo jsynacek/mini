@@ -195,6 +195,8 @@ int command_move_end_of_buffer(void);
 int command_move_forward_bracket(void);
 int command_move_backward_bracket(void);
 int command_goto_line(void);
+int command_insert_newline(void);
+int command_insert_self(void);
 int command_insert_unicode(void);
 int command_open_below(void);
 int command_open_above(void);
