@@ -64,17 +64,20 @@ struct keybinding dvorak_keybindings[] = {
 	{'Q', M_COMMAND|M_EDITING, command_clear},
 	{'k', M_COMMAND, command_paste},
 	{'v', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
-	{'s', M_COMMAND|M_SELECTION, command_search_forward},
-	{'S', M_COMMAND|M_SELECTION, command_search_backward},
-	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
+	{KEY_ESC, M_ALL, command_editor_command_mode},
 	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
 	{CTRL('s'), M_ALL_BASIC, command_save_buffer},
 	{CTRL('w'), M_ALL_BASIC, command_write_buffer},
 	{CTRL('o'), M_ALL_BASIC, command_load_buffer},
-	{CTRL('q'), M_ALL_BASIC, command_editor_quit},
+	{CTRL('q'), M_ALL, command_editor_quit},
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
 	{CTRL('l'), M_ALL_BASIC, command_recenter},
+	/* Searching. */
+	{'s', M_COMMAND, command_search_forward},
+	{'S', M_COMMAND, command_search_backward},
+	{'w', M_COMMAND, command_goto_next_search},
+	{'W', M_COMMAND, command_goto_previous_search},
 	/* Self insertion. */
 	{KEY_ENTER, M_EDITING, command_insert_newline},
 	{KEY_ANY, M_EDITING, command_insert_self},
@@ -116,9 +119,7 @@ struct keybinding qwerty_keybindings[] = {
 	{'X', M_COMMAND|M_EDITING, command_clear},
 	{'v', M_COMMAND, command_paste},
 	{'.', M_COMMAND|M_SELECTION, command_toggle_selection_mode},
-	{';', M_COMMAND|M_SELECTION, command_search_forward},
-	{':', M_COMMAND|M_SELECTION, command_search_backward},
-	{KEY_ESC, M_EDITING|M_SELECTION, command_editor_command_mode},
+	{KEY_ESC, M_ALL, command_editor_command_mode},
 	{KEY_ENTER, M_COMMAND, command_editor_editing_mode},
 	{CTRL('s'), M_ALL_BASIC, command_save_buffer},
 	{CTRL('w'), M_ALL_BASIC, command_write_buffer},
@@ -127,6 +128,11 @@ struct keybinding qwerty_keybindings[] = {
 	{']', M_COMMAND|M_SELECTION, command_next_buffer},
 	{'[', M_COMMAND|M_SELECTION, command_previous_buffer},
 	{CTRL('l'), M_ALL_BASIC, command_recenter},
+	/* Searching. */
+	{';', M_COMMAND, command_search_forward},
+	{':', M_COMMAND, command_search_backward},
+	{',', M_COMMAND, command_goto_next_search},
+	{'<', M_COMMAND, command_goto_previous_search},
 	/* Self insertion. */
 	{KEY_ENTER, M_EDITING, command_insert_newline},
 	{KEY_ANY, M_EDITING, command_insert_self},
@@ -477,6 +483,55 @@ int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *
 	return buffer_find_char(buf, from, -1, accept, newlines);
 }
 
+int buffer_find_str_next(struct buffer *buf, int from, const char *str, int *newlines)
+{
+	char *text, *start, *s;
+	int p = -1;
+
+	text = buffer_get_content(buf);
+	start = text + from;
+	s = strstr(start, str);
+	*newlines = 0;
+	if (s) {
+		p = s - start;
+		*newlines = str_newlines(start, p);
+	}
+	free(text);
+
+	return p;
+}
+int buffer_find_str_prev(struct buffer *buf, int from, const char *str, int *newlines)
+{
+	char *text, *s;
+	int p = -1;
+
+	text = buffer_get_content(buf);
+
+	*newlines = 0;
+	/* TODO: If the stars ever align correctly, this mess should be simplified... */
+	s = strstr(text, str);
+	if (s) {
+		while (1) {
+			int len;
+
+			s = strstr(text + p + 1, str);
+			if (s) {
+				len = s - (text + p);
+				if (p + len < from)
+					p += len;
+				else
+					break;
+			} else {
+				break;
+			}
+		}
+		*newlines += str_newlines(text, p);
+
+	}
+	free(text);
+
+	return p;
+}
 
 static void buffer_cursor_column_update(struct buffer *buf)
 {
@@ -951,6 +1006,8 @@ void editor_init(int argc, char *argv[])
 	editor.cursor_last = 0;
 	editor.line_last = 0;
 	editor.key_last = 0;
+	editor.search_last = NULL;
+	editor.search_dir = SEARCH_FORWARD;
 	editor.keybindings = DEFAULT_KEYBINDINGS;
 
 	buf = buffer_new();
@@ -1443,25 +1500,121 @@ int command_toggle_selection_mode(void)
 	return 0;
 }
 
+static void search_action(void)
+{
+	editor.mode = M_COMMAND;
+}
+static void search_update_common(char *str)
+{
+	int p, nl;
+
+	if (editor.search_dir == SEARCH_FORWARD) {
+		p = buffer_find_str_next(editor.buf_current,
+					 editor.cursor_last,
+					 str,
+					 &nl);
+		if (p >= 0) {
+			editor.buf_current->cursor = editor.cursor_last + p;
+			editor.buf_current->cur_line = editor.line_last + nl;
+		}
+	} else {
+		p = buffer_find_str_prev(editor.buf_current,
+					 editor.cursor_last,
+					 str,
+					 &nl);
+		if (p >= 0) {
+			editor.buf_current->cursor = p;
+			editor.buf_current->cur_line = nl;
+		}
+	}
+}
+static void search_update(void)
+{
+	char *text;
+
+	text = buffer_get_content(editor.minibuf.buf);
+
+	if (editor.minibuf.buf->used == 0) {
+		editor.buf_current->cursor = editor.cursor_last;
+		editor.buf_current->cur_line = editor.line_last;
+	} else {
+		search_update_common(text);
+		editor.search_last = strdup(text); /* TODO: LEAK! */
+	}
+	free(text);
+
+	command_recenter();
+	editor.mode = M_MINIBUFFER;
+}
+static void search_cancel(void)
+{
+	editor.mode = M_COMMAND;
+	editor.buf_current->cursor = editor.cursor_last;
+	editor.buf_current->cur_line = editor.line_last;
+	command_recenter();
+}
+static int command_search_common(char *prompt)
+{
+	buffer_clear(editor.minibuf.buf);
+	editor.cursor_last = editor.buf_current->cursor;
+	editor.line_last = editor.buf_current->cur_line;
+	editor.mode = M_MINIBUFFER;
+	editor.minibuf.prompt = prompt;
+	editor.minibuf.action_cb = search_action;
+	editor.minibuf.update_cb = search_update;
+	editor.minibuf.cancel_cb = search_cancel;
+	return 0;
+}
+
 int command_search_forward(void)
 {
-	char *str;
-
-	str = editor_dialog("Search → ");
-	buffer_search_forward(editor.buf_current, str);
-
-	free(str);
-	return 0;
+	editor.search_dir = SEARCH_FORWARD;
+	return command_search_common("Search → ");
 }
 
 int command_search_backward(void)
 {
-	char *str;
+	editor.search_dir = SEARCH_BACKWARD;
+	return command_search_common("Search ← ");
+}
 
-	str = editor_dialog("Search ← ");
-	buffer_search_backward(editor.buf_current, str);
+int command_goto_next_search(void)
+{
+	int p, nl;
 
-	free(str);
+	editor.mode = M_COMMAND;
+	if (!editor.search_last)
+		return 0;
+
+	p = buffer_find_str_next(editor.buf_current,
+				 editor.buf_current->cursor + 1,
+				 editor.search_last,
+				 &nl);
+	if (p >= 0) {
+		editor.buf_current->cursor += p + 1;
+		editor.buf_current->cur_line += nl;
+	}
+
+	return 0;
+}
+
+int command_goto_previous_search(void)
+{
+	int p, nl;
+
+	editor.mode = M_COMMAND;
+	if (!editor.search_last)
+		return 0;
+
+	p = buffer_find_str_prev(editor.buf_current,
+				 editor.buf_current->cursor,
+				 editor.search_last,
+				 &nl);
+	if (p >= 0) {
+		editor.buf_current->cursor = p;
+		editor.buf_current->cur_line = nl;
+	}
+
 	return 0;
 }
 

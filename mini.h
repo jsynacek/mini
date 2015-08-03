@@ -79,6 +79,8 @@ char *buffer_get_content(struct buffer *buf);
 int buffer_find_char(struct buffer *buf, int from, int way, const char *accept, int *newlines);
 int buffer_find_next(struct buffer *buf, int from, const char *accept, int *newlines);
 int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *newlines);
+int buffer_find_str_next(struct buffer *buf, int from, const char *str, int *newlines);
+int buffer_find_str_prev(struct buffer *buf, int from, const char *str, int *newlines);
 
 /* Buffer movement */
 void buffer_move_forward_char(struct buffer *buf);
@@ -162,6 +164,8 @@ struct editor {
 	int cursor_last;
 	int line_last;
 	int key_last;
+	char *search_last;
+	enum { SEARCH_FORWARD, SEARCH_BACKWARD } search_dir;
 	struct keybinding *keybindings;
 };
 
@@ -210,6 +214,8 @@ int command_paste(void);
 int command_toggle_selection_mode(void);
 int command_search_forward(void);
 int command_search_backward(void);
+int command_goto_next_search(void);
+int command_goto_previous_search(void);
 int command_editor_command_mode(void);
 int command_editor_editing_mode(void);
 int command_save_buffer(void);
