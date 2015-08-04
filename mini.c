@@ -473,12 +473,12 @@ int buffer_find_char(struct buffer *buf, int from, int way, const char *accept, 
 	return -1;
 }
 
-int buffer_find_next(struct buffer *buf, int from, const char *accept, int *newlines)
+int buffer_find_char_next(struct buffer *buf, int from, const char *accept, int *newlines)
 {
 	return buffer_find_char(buf, from, 1, accept, newlines);
 }
 
-int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *newlines)
+int buffer_find_char_prev(struct buffer *buf, int from, const char *accept, int *newlines)
 {
 	return buffer_find_char(buf, from, -1, accept, newlines);
 }
@@ -659,7 +659,7 @@ void buffer_move_forward_bracket(struct buffer *buf)
 {
 	int p, nl;
 
-	p = buffer_find_next(buf, buf->cursor + 1, "([{<", &nl);
+	p = buffer_find_char_next(buf, buf->cursor + 1, "([{<", &nl);
 	if (p >= 0) {
 		if (buffer_data_at(buf, buf->cursor) == '\n')
 			nl++;
@@ -672,7 +672,7 @@ void buffer_move_backward_bracket(struct buffer *buf)
 {
 	int p, nl;
 
-	p = buffer_find_previous(buf, buf->cursor - 1, ")]}>", &nl);
+	p = buffer_find_char_prev(buf, buf->cursor - 1, ")]}>", &nl);
 	if (p >= 0) {
 		buf->cursor = p;
 		buf->cur_line -= nl;
@@ -690,7 +690,7 @@ void buffer_goto_line(struct buffer *buf, int line)
 		int tmp;
 
 		lastp = p;
-		p = buffer_find_next(buf, p, "\n", &tmp);
+		p = buffer_find_char_next(buf, p, "\n", &tmp);
 		if (p < 0)
 			break;
 		else {

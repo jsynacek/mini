@@ -77,8 +77,8 @@ void buffer_get_region(struct buffer *buf, int line_start, int lines, int *beg, 
 void buffer_get_yx(struct buffer *buf, int *y, int *x);
 char *buffer_get_content(struct buffer *buf);
 int buffer_find_char(struct buffer *buf, int from, int way, const char *accept, int *newlines);
-int buffer_find_next(struct buffer *buf, int from, const char *accept, int *newlines);
-int buffer_find_previous(struct buffer *buf, int from, const char *accept, int *newlines);
+int buffer_find_char_next(struct buffer *buf, int from, const char *accept, int *newlines);
+int buffer_find_char_prev(struct buffer *buf, int from, const char *accept, int *newlines);
 int buffer_find_str_next(struct buffer *buf, int from, const char *str, int *newlines);
 int buffer_find_str_prev(struct buffer *buf, int from, const char *str, int *newlines);
 
