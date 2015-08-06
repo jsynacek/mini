@@ -33,13 +33,12 @@
 
 /** Buffer */
 
-#define BUFFER_NAME_SIZE   512
 #define BUFFER_ALLOC_CHUNK 256
 
 struct buffer {
 	struct buffer *buf_next;
 	struct buffer *buf_prev;
-	char name[BUFFER_NAME_SIZE];
+	char *name;
 	char *path;
 	unsigned size;
 	unsigned used;
@@ -123,6 +122,7 @@ bool is_position_in_buffer(int pos, struct buffer *buf);
 bool is_position_in_region(int pos, int beg, int end);
 int str_newlines(const char *str, int n);
 int region_newlines(struct buffer *buf, int beg, int end);
+void die(const char *fmt, ...);
 void oom();
 
 /** Editor */

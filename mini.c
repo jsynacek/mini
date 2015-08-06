@@ -23,11 +23,13 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include <curses.h>
 #include "mini.h"
@@ -175,6 +177,12 @@ struct color_pair color_pairs[] = {
 	{-1, -1, -1}
 };
 
+static void buffer_set_name(struct buffer *buf, const char *name)
+{
+	if (buf->name)
+		free(buf->name);
+	buf->name = strdup(name);
+}
 
 struct buffer *buffer_new(void)
 {
@@ -183,12 +191,12 @@ struct buffer *buffer_new(void)
 	buf = calloc(1, sizeof(struct buffer));
 	if (!buf)
 		oom();
-	strcpy(buf->name, "*Untitled*");
 	buf->size = BUFFER_ALLOC_CHUNK;
 	buf->data = calloc(BUFFER_ALLOC_CHUNK, 1);
 	if (!buf->data)
 		oom();
 	buf->gap_end = buf->size;
+	buffer_set_name(buf, "*Untitled*");
 
 	return buf;
 }
@@ -219,28 +227,45 @@ int buffer_save(struct buffer *buf, const char *path)
 
 int buffer_load(struct buffer *buf, const char *path)
 {
-	FILE *fp;
-	char *tmp_buf;
-	size_t read;
-	int rc = 0;
+	struct stat sb;
 
 	assert(buf);
 
-	fp = fopen(path, "r");
-	if (!fp)
-		return -1;
+	int rc = stat(path, &sb);
+	if (rc < 0) {
+		if (errno != ENOENT)
+			return -errno;
+	} else {
+		FILE *fp;
+		char *tmp_buf;
+		size_t read;
 
-	tmp_buf = malloc(BUFFER_ALLOC_CHUNK);
-	assert(tmp_buf);
-	while ((read = fread(tmp_buf, 1, BUFFER_ALLOC_CHUNK, fp)) > 0)
-		buffer_insert_string(buf, tmp_buf, read);
-	free(tmp_buf);
-	fclose(fp);
+		if (S_ISDIR(sb.st_mode)) {
+			/* TODO: For now. */
+			errno = EISDIR;
+			return -errno;
+		} else if (!S_ISREG(sb.st_mode)) {
+			errno = ENOTSUP;
+			return -errno;
+		}
 
+		/* At this point, fopen() should always succeed. */
+		fp = fopen(path, "r");
+		assert(fp);
+
+		tmp_buf = malloc(BUFFER_ALLOC_CHUNK);
+		assert(tmp_buf);
+		while ((read = fread(tmp_buf, 1, BUFFER_ALLOC_CHUNK, fp)) > 0)
+			buffer_insert_string(buf, tmp_buf, read);
+		free(tmp_buf);
+		fclose(fp);
+	}
 	buffer_set_path(buf, path);
 	buf->modified = false;
+	buf->cursor = 0;
+	buf->cur_line = 0;
 
-	return rc;
+	return 0;
 }
 
 void buffer_set_path(struct buffer *buf, const char *path)
@@ -255,7 +280,7 @@ void buffer_set_path(struct buffer *buf, const char *path)
 		name += 1;
 	else
 		name = (char *)path;
-	strncpy(buf->name, name, BUFFER_NAME_SIZE);
+	buffer_set_name(buf, name);
 }
 
 int cursor_to_data(struct buffer *buf, int pos)
@@ -921,21 +946,6 @@ int buffer_search_backward(struct buffer *buf, const char *str)
 	return p;
 }
 
-void die(const char *fmt, ...)
-{
-	va_list va;
-
-	/* In case curses are still active */
-	endwin();
-
-	va_start(va, fmt);
-	vfprintf(stderr, fmt, va);
-	va_end(va);
-	fprintf(stderr, "\n");
-
-	exit(1);
-}
-
 bool is_position_in_buffer(int pos, struct buffer *buf)
 {
 	return pos >= 0 && pos < buf->used;
@@ -986,14 +996,44 @@ int region_newlines(struct buffer *buf, int beg, int end)
 	return nl;
 }
 
+void die(const char *fmt, ...)
+{
+	va_list va;
+
+	/* In case curses are still active */
+	endwin();
+
+	va_start(va, fmt);
+	vfprintf(stderr, fmt, va);
+	va_end(va);
+	fprintf(stderr, "\n");
+
+	exit(1);
+}
+
 void oom()
 {
 	die("Out of mana!");
 }
 
+static void editor_create_buffer(const char *path)
+{
+	struct buffer *buf;
+
+	buf = buffer_new();
+	if (!buf)
+		oom();
+	editor_add_buffer(buf);
+	editor.buf_current = buf;
+
+	if (path && buffer_load(buf, path) < 0)
+		die("Can't open '%s': %m", path);
+}
+
 void editor_init(int argc, char *argv[])
 {
 	struct buffer *buf = NULL;
+	int i = 1;
 
 	editor.buf_first = NULL;
 	editor.buf_last = NULL;
@@ -1010,20 +1050,11 @@ void editor_init(int argc, char *argv[])
 	editor.search_dir = SEARCH_FORWARD;
 	editor.keybindings = DEFAULT_KEYBINDINGS;
 
-	buf = buffer_new();
-	if (!buf)
-		oom();
+	if (argc == 1)
+		editor_create_buffer(NULL);
 
-	if (argc > 1) {
-		buffer_load(buf, argv[1]);
-		if (!buf) {
-			endwin();
-			die("Can't open '%s'\n", argv[1]);
-		}
-	}
-	buffer_move_beginning_of_buffer(buf);
-	editor_add_buffer(buf);
-	editor.buf_current = buf;
+	while (i < argc)
+		editor_create_buffer(argv[i++]);
 
 	/* Special-purpose minibuffer. Can't be accessed directly. */
 	buf = buffer_new();
