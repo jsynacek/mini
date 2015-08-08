@@ -42,3 +42,25 @@ int unicode_to_utf8(unsigned int codepoint, unsigned char *utf8)
 
 	return len;
 }
+
+/* Convert a UTF-8 byte sequence of the given length into a unicode codepoint.
+ * Return the codepoint or -1 if there are any errors. */
+int utf8_to_unicode(unsigned char *utf8, unsigned int len)
+{
+	int codepoint = 0, mask, i;
+
+	if (len > 4)
+		return -1;
+	if (len == 1)
+		return *utf8;
+
+	mask = 0xff >> len+1;
+	codepoint = (utf8[0] & mask) << 6*(len-1);
+	i = 1;
+	while (i < len) {
+		codepoint |= (utf8[i] & 0x3f) << 6*(len-1-i);
+		i++;
+	}
+
+	return codepoint;
+}

@@ -13,3 +13,4 @@
 static inline bool is_utf8(char c) { return (c & 0xc0) != 0x80; }
 
 int unicode_to_utf8(unsigned int codepoint, unsigned char *utf8);
+int utf8_to_unicode(unsigned char *utf8, unsigned int len);
